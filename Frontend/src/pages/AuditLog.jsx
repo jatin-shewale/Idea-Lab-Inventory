@@ -11,6 +11,7 @@ const AuditLog = () => {
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchAuditLogs();
@@ -19,12 +20,12 @@ const AuditLog = () => {
   const fetchAuditLogs = async () => {
     try {
       setLoading(true);
-      const response = await axiosInstance.get('/api/issues', {
-        params: {
-          status: selectedStatus === 'all' ? undefined : selectedStatus,
-        },
-      });
-      setAuditLogs(Array.isArray(response.data.issues) ? response.data.issues : []);
+      const response = await axiosInstance.get('/api/issues');
+      // Sort logs by timestamp in descending order (most recent first)
+      const sortedLogs = Array.isArray(response.data.issues) 
+        ? response.data.issues.sort((a, b) => new Date(b.timestamp || b.createdAt) - new Date(a.timestamp || a.createdAt))
+        : [];
+      setAuditLogs(sortedLogs);
     } catch (error) {
       console.error('Error fetching audit logs:', error);
       toast.error('Failed to load audit logs');
@@ -36,9 +37,9 @@ const AuditLog = () => {
   
   const handleMarkReturned = async (issueId) => {
     try {
-      await axiosInstance.put(`/api/issues/${issueId}`, { status: 'returned' }); // Use axiosInstance
+      await axiosInstance.put(`/api/issues/${issueId}`, { status: 'returned' });
       toast.success('Component marked as returned');
-      fetchAuditLogs(); // Re-fetch the updated audit logs
+      fetchAuditLogs();
     } catch (error) {
       console.error('Error updating issue status:', error);
       toast.error('Failed to update status');
@@ -46,17 +47,32 @@ const AuditLog = () => {
   };
 
   const filteredLogs = Array.isArray(auditLogs) ? auditLogs.filter(log => {
-    if (selectedStatus === 'all') return true;
-    return log.status === selectedStatus;
+    // First check status filter
+    if (selectedStatus !== 'all' && log.status !== selectedStatus) {
+      return false;
+    }
+
+    // Then check search query if it exists
+    if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
+      return (
+        (log.studentName && log.studentName.toLowerCase().includes(searchLower)) || 
+        (log.studentId && log.studentId.toLowerCase().includes(searchLower)) ||
+        (log.department && log.department.toLowerCase().includes(searchLower)) ||
+        (log.componentId && log.componentId.toLowerCase().includes(searchLower))
+      );
+    }
+
+    return true;
   }) : [];
 
   // Calculate status distribution for pie chart
   const statusDistribution = {
-    issued: Array.isArray(auditLogs) ? auditLogs.filter(log => log.status === 'issued').length : 0,
+    request: Array.isArray(auditLogs) ? auditLogs.filter(log => log.status === 'request').length : 0,
+    pending: Array.isArray(auditLogs) ? auditLogs.filter(log => log.status === 'pending').length : 0,
     returned: Array.isArray(auditLogs) ? auditLogs.filter(log => log.status === 'returned').length : 0
   };
 
-  // Calculate monthly usage statistics
   const getMonthlyUsage = () => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const currentYear = new Date().getFullYear();
@@ -86,23 +102,34 @@ const AuditLog = () => {
         returnedIssues: 0,
         totalComponents: 0,
         departmentCount: 0,
-        departments: []
+        departments: [],
+        categoryDistribution: {}
       };
     }
 
     const totalIssues = auditLogs.length;
-    const pendingIssues = auditLogs.filter(log => log.status === 'issued').length;
+    const pendingIssues = auditLogs.filter(log => log.status === 'pending').length;
     const returnedIssues = auditLogs.filter(log => log.status === 'returned').length;
     const totalComponents = auditLogs.reduce((sum, log) => sum + (log.quantity || 0), 0);
     const departments = [...new Set(auditLogs.map(log => log.department).filter(Boolean))];
     
+    const categoryDistribution = auditLogs.reduce((acc, log) => {
+      const category = log.category || 'Uncategorized';
+      if (!acc[category]) {
+        acc[category] = 0;
+      }
+      acc[category]++;
+      return acc;
+    }, {});
+
     return {
       totalIssues,
       pendingIssues,
       returnedIssues,
       totalComponents,
       departmentCount: departments.length,
-      departments
+      departments,
+      categoryDistribution
     };
   };
 
@@ -110,15 +137,17 @@ const AuditLog = () => {
   const stats = calculateStats();
 
   const pieChartData = {
-    labels: ['Pending', 'Returned'],
+    labels: ['Request', 'Pending', 'Returned'],
     datasets: [
       {
-        data: [statusDistribution.issued, statusDistribution.returned],
+        data: [statusDistribution.request, statusDistribution.pending, statusDistribution.returned],
         backgroundColor: [
+          'rgba(59, 130, 246, 0.8)', // blue for request
           'rgba(234, 179, 8, 0.8)', // yellow for pending
           'rgba(34, 197, 94, 0.8)', // green for returned
         ],
         borderColor: [
+          'rgba(59, 130, 246, 1)',
           'rgba(234, 179, 8, 1)',
           'rgba(34, 197, 94, 1)',
         ],
@@ -148,7 +177,7 @@ const AuditLog = () => {
       },
       title: {
         display: true,
-        text: 'Component Status Distribution',
+        text: 'All-Time Component Status Distribution',
         font: {
           size: 16,
         },
@@ -180,6 +209,36 @@ const AuditLog = () => {
     },
   };
 
+  const categoryChartData = {
+    labels: Object.keys(stats.categoryDistribution || {}),
+    datasets: [
+      {
+        data: Object.values(stats.categoryDistribution || {}),
+        backgroundColor: [
+          'rgba(99, 102, 241, 0.8)',  // Indigo - for system actions
+          'rgba(16, 185, 129, 0.8)',  // Emerald - for successful operations
+          'rgba(245, 158, 11, 0.8)',  // Amber - for warnings
+          'rgba(239, 68, 68, 0.8)',   // Red - for errors
+          'rgba(139, 92, 246, 0.8)',  // Violet - for security events
+          'rgba(14, 165, 233, 0.8)',  // Sky - for information
+          'rgba(20, 184, 166, 0.8)',  // Teal - for updates
+          'rgba(249, 115, 22, 0.8)',  // Orange - for modifications
+        ],
+        borderColor: [
+          'rgba(99, 102, 241, 1)',
+          'rgba(16, 185, 129, 1)',
+          'rgba(245, 158, 11, 1)',
+          'rgba(239, 68, 68, 1)',
+          'rgba(139, 92, 246, 1)',
+          'rgba(14, 165, 233, 1)',
+          'rgba(20, 184, 166, 1)',
+          'rgba(249, 115, 22, 1)',
+        ],
+        borderWidth: 1,
+      },
+    ],
+  };
+
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex justify-between items-center mb-6">
@@ -191,7 +250,8 @@ const AuditLog = () => {
             className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="all">All Status</option>
-            <option value="issued">Pending</option>
+            <option value="request">Request</option>
+            <option value="pending">Pending</option>
             <option value="returned">Returned</option>
           </select>
         </div>
@@ -213,7 +273,18 @@ const AuditLog = () => {
 
       {/* Issue History */}
       <div className="bg-white rounded-lg shadow-sm p-5 mb-6">
-        <h2 className="text-lg font-medium mb-4">Issue History</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-medium">Issue History</h2>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Search by student name or ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+        </div>
         <div className="overflow-x-auto">
           {loading ? (
             <div className="flex justify-center items-center py-4">
@@ -226,32 +297,35 @@ const AuditLog = () => {
           ) : (
             <div className="space-y-3">
               {filteredLogs.map((log) => (
-                <div key={log._id} className="border rounded-md p-4 hover:bg-gray-50">
+                <div key={log._id} className="border-b border-gray-100 last:border-b-0 pb-4 last:pb-0">
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="font-medium text-sm">{log.studentName}</div>
-                      <div className="text-xs text-gray-500">{log.studentId} • {log.department} • Sem {log.semester}</div>
+                      <div className="font-medium text-gray-900">{log.studentName} ({log.studentId})</div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        {log.department} • {new Date(log.issueDate).toLocaleDateString()}
+                      </div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        Component: {log.componentId} • Quantity: {log.quantity}
+                      </div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        Purpose: {log.purpose}
+                      </div>
                     </div>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      log.status === 'returned' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                      log.status === 'returned' 
+                        ? 'bg-green-100 text-green-800' 
+                        : log.status === 'pending'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-blue-100 text-blue-800'
                     }`}>
                       {log.status}
                     </span>
                   </div>
-                  <div className="mt-2 text-sm">
-                    <div className="font-medium">{log.componentName}</div>
-                    <div className="text-xs text-gray-500">ID: {log.componentId} • Qty: {log.quantity}</div>
-                  </div>
-                  <div className="mt-2 text-xs text-gray-500">
-                    <div>Issue: {new Date(log.issueDate).toLocaleDateString()}</div>
-                    <div>Return: {new Date(log.expectedReturnDate).toLocaleDateString()}</div>
-                    <div>Faculty: {log.facultyIncharge}</div>
-                  </div>
-                  {log.status === 'issued' && (
-                    <div className="mt-3 flex justify-end">
+                  {log.status === 'pending' && (
+                    <div className="mt-3">
                       <button
                         onClick={() => handleMarkReturned(log._id)}
-                        className="bg-green-600 text-white py-1 px-3 rounded-md hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 focus:ring-offset-1 text-xs font-medium"
+                        className="text-xs bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
                       >
                         Mark as Returned
                       </button>

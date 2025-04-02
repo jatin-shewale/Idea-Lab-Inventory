@@ -19,7 +19,7 @@ export function AuthProvider({ children }) {
     try {
       const token = localStorage.getItem('token');
       if (token) {
-        const response = await axios.get('/api/auth/me');
+        const response = await axios.get('/api/auth/profile');
         setUser(response.data);
       }
     } catch (error) {
@@ -34,7 +34,8 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     try {
       const response = await axios.post('/api/auth/login', { email, password });
-      const { token, user } = response.data;
+      const { token, _id, name, email: userEmail } = response.data;
+      const user = { id: _id, name, email: userEmail };
       localStorage.setItem('token', token);
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(user);
@@ -47,7 +48,8 @@ export function AuthProvider({ children }) {
   const register = async (userData) => {
     try {
       const response = await axios.post('/api/auth/register', userData);
-      const { token, user } = response.data;
+      const { token, _id, name, email: userEmail } = response.data;
+      const user = { id: _id, name, email: userEmail };
       localStorage.setItem('token', token);
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(user);

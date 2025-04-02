@@ -1,30 +1,26 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axiosInstance from "../utils/axiosInstance.js";
+import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     setLoading(true);
-    try {
-      const response = await axiosInstance.post("/api/auth/login", {
-        email: email, // Use the email state variable
-        password: password, // Use the password state variable
-      });
 
-      localStorage.setItem("token", response.data.token);
+    try {
+      await login(email, password);
       toast.success("Login successful!");
       navigate("/dashboard");
     } catch (error) {
       console.error("Login error:", error);
-      toast.error(error.response?.data?.message || "Failed to log in");
+      toast.error(error || "Failed to log in");
     } finally {
       setLoading(false);
     }

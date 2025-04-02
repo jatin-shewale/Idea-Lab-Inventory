@@ -1,4 +1,5 @@
 import Issue from "../Models/Issue.js";
+import Inventory from "../Models/Inventory.js";
 
 // Create a new issue
 export const createIssue = async (req, res) => {
@@ -14,20 +15,39 @@ export const createIssue = async (req, res) => {
   } = req.body;
 
   try {
+    // Check if component exists and has sufficient quantity
+    const inventoryItem = await Inventory.findById(componentId);
+    if (!inventoryItem) {
+      return res.status(404).json({ message: "Component not found" });
+    }
+
+    if (inventoryItem.quantity < quantity) {
+      return res.status(400).json({ message: "Insufficient quantity available" });
+    }
+
+    // Create the issue
     const issue = await Issue.create({
       studentName,
       studentId,
       department,
-      componentId,
+      componentId: inventoryItem._id, // Use the component's _id
       quantity,
       issueDate,
       expectedReturnDate,
       purpose,
-      status: "issued", // Default status
+      status: "pending", // Set status to pending
+      user: req.user._id, // Use the authenticated user's ID
     });
+
+    // Update inventory quantity
+    await Inventory.findByIdAndUpdate(
+      inventoryItem._id,
+      { $inc: { quantity: -quantity } }
+    );
 
     res.status(201).json(issue);
   } catch (error) {
+    console.error('Error creating issue:', error);
     res.status(500).json({ message: error.message });
   }
 };

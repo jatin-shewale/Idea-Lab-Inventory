@@ -1,8 +1,18 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import toast from 'react-hot-toast';
 
 const Navbar = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    toast.success('Logged out successfully');
+    navigate('/login');
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 bg-white shadow-sm z-50">
@@ -42,7 +52,7 @@ const Navbar = () => {
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
                 className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-100 to-blue-200 flex items-center justify-center hover:from-blue-200 hover:to-blue-300 transition-all duration-200 shadow-sm"
               >
-                <span className="text-base font-semibold text-blue-600">J</span>
+                <span className="text-base font-semibold text-blue-600">{user?.name?.[0] || 'U'}</span>
               </button>
               
               {showProfileMenu && (
@@ -56,15 +66,15 @@ const Navbar = () => {
                     </svg>
                     Edit Profile
                   </Link>
-                  <Link
-                    to="/sign-out"
-                    className="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left block px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
                   >
                     <svg className="w-4 h-4 mr-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                     </svg>
                     Sign out
-                  </Link>
+                  </button>
                 </div>
               )}
             </div>

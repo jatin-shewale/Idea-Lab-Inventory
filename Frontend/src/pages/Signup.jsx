@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import axiosInstance from '../utils/axiosInstance.js';
+import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 const Signup = () => {
   const navigate = useNavigate();
+  const { register } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -24,26 +24,25 @@ const Signup = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match');
+      setLoading(false);
       return;
     }
-  
-    setLoading(true);
+
     try {
-      const response = await axiosInstance.post('/api/auth/register', {
+      await register({
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        role: 'admin', // Set role to admin
       });
-  
-      localStorage.setItem('token', response.data.token);
-      toast.success('Account created successfully!');
+      toast.success('Registration successful!');
       navigate('/dashboard');
     } catch (error) {
-      console.error('Signup error:', error);
-      toast.error(error.response?.data?.message || 'Failed to create account');
+      console.error('Registration error:', error);
+      toast.error(error || 'Failed to register');
     } finally {
       setLoading(false);
     }
@@ -71,10 +70,10 @@ const Signup = () => {
       <div className="max-w-md w-full bg-white/90 backdrop-blur-sm rounded-xl shadow-2xl p-8 relative z-10">
         <div className="text-center">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Create Admin Account
+            Create Account
           </h2>
           <p className="text-sm text-gray-600 mb-8">
-            Sign up to manage IdeaLab
+            Sign up to get started with the inventory management system
           </p>
         </div>
         
@@ -120,12 +119,11 @@ const Signup = () => {
               id="password"
               name="password"
               type="password"
-              autoComplete="new-password"
               required
               value={formData.password}
               onChange={handleChange}
               className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/50"
-              placeholder="Create a password"
+              placeholder="Enter your password"
             />
           </div>
 
@@ -137,7 +135,6 @@ const Signup = () => {
               id="confirmPassword"
               name="confirmPassword"
               type="password"
-              autoComplete="new-password"
               required
               value={formData.confirmPassword}
               onChange={handleChange}
@@ -151,7 +148,7 @@ const Signup = () => {
             disabled={loading}
             className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
           >
-            {loading ? 'Creating Account...' : 'Create Account'}
+            {loading ? 'Creating account...' : 'Create account'}
           </button>
 
           <div className="text-center text-sm">

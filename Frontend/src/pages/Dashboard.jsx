@@ -1,45 +1,171 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import axiosInstance from '../utils/axiosInstance.js';
 import toast from 'react-hot-toast';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
+import { Pie, Bar } from 'react-chartjs-2';
+
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState({
     totalComponents: 0,
-    lowStockItems: 0,
-    pendingRequests: 0,
-    recentActivity: 0,
+    totalIssues: 0,
+    pendingIssues: 0,
+    returnedIssues: 0,
+    lowStockComponents: 0,
+    totalValue: 0,
+    categoryDistribution: {},
+    componentQuantities: [],
+    recentActivity: []
   });
-  const [recentRequests, setRecentRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchDashboardStats = async () => {
     try {
-      const [statsResponse, requestsResponse] = await Promise.all([
-        axiosInstance.get('/api/dashboard/stats'), // Use axiosInstance
-        axiosInstance.get('/api/dashboard/recent-requests'), // Use axiosInstance
-      ]);
-  
-      setStats(statsResponse.data || {
-        totalComponents: 0,
-        lowStockItems: 0,
-        pendingRequests: 0,
-        recentActivity: 0,
-      });
-      setRecentRequests(Array.isArray(requestsResponse.data) ? requestsResponse.data : []);
+      setLoading(true);
+      const response = await axiosInstance.get('/api/dashboard/stats');
+      if (response.data) { // Debug log
+        setStats(response.data);
+      }
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      toast.error('Failed to load dashboard data');
-      setRecentRequests([]);
+      console.error('Error fetching dashboard stats:', error);
+      toast.error('Failed to load dashboard statistics');
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchDashboardStats();
+    // Set up an interval to refresh data every 30 seconds
+    const intervalId = setInterval(fetchDashboardStats, 30000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
+  }, []);
+
+  const categoryChartData = {
+    labels: Object.keys(stats.categoryDistribution || {}),
+    datasets: [
+      {
+        data: Object.values(stats.categoryDistribution || {}),
+        backgroundColor: [
+          'rgba(99, 102, 241, 0.8)',  // Indigo
+          'rgba(16, 185, 129, 0.8)',  // Emerald
+          'rgba(245, 158, 11, 0.8)',  // Amber
+          'rgba(239, 68, 68, 0.8)',   // Red
+          'rgba(139, 92, 246, 0.8)',  // Violet
+          'rgba(14, 165, 233, 0.8)',  // Sky
+          'rgba(20, 184, 166, 0.8)',  // Teal
+          'rgba(249, 115, 22, 0.8)',  // Orange
+        ],
+        borderColor: [
+          'rgba(99, 102, 241, 1)',
+          'rgba(16, 185, 129, 1)',
+          'rgba(245, 158, 11, 1)',
+          'rgba(239, 68, 68, 1)',
+          'rgba(139, 92, 246, 1)',
+          'rgba(14, 165, 233, 1)',
+          'rgba(20, 184, 166, 1)',
+          'rgba(249, 115, 22, 1)',
+        ],
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const quantityChartData = {
+    labels: (stats.componentQuantities || []).map(item => item.name),
+    datasets: [
+      {
+        label: 'Component Quantities',
+        data: (stats.componentQuantities || []).map(item => item.quantity),
+        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+        borderColor: 'rgba(59, 130, 246, 1)',
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          padding: 20,
+          font: {
+            size: 12
+          }
+        }
+      },
+      title: {
+        display: true,
+        text: 'Component Category Distribution',
+        font: {
+          size: 16,
+          weight: 'bold'
+        },
+        padding: {
+          bottom: 20
+        }
+      },
+    },
+  };
+
+  const barChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          padding: 20,
+          font: {
+            size: 12
+          }
+        }
+      },
+      title: {
+        display: true,
+        text: 'Component Quantities',
+        font: {
+          size: 16,
+          weight: 'bold'
+        },
+        padding: {
+          bottom: 20
+        }
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          stepSize: 1,
+          font: {
+            size: 12
+          }
+        },
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)'
+        }
+      },
+      x: {
+        ticks: {
+          font: {
+            size: 12
+          }
+        },
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)'
+        }
+      }
+    },
   };
 
   if (loading) {
@@ -51,180 +177,132 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="bg-white rounded-2xl shadow-sm p-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Welcome back, {user?.name}!
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Here's what's happening with your inventory today
-        </p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-blue-100">
-              <svg
-                className="h-6 w-6 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <h2 className="text-sm font-medium text-gray-500">Total Components</h2>
-              <p className="text-2xl font-semibold text-gray-900">{stats.totalComponents}</p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
+          <p className="mt-2 text-gray-600">Welcome back, {user?.name}! Here's your inventory overview.</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-yellow-100">
-              <svg
-                className="h-6 w-6 text-yellow-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <h2 className="text-sm font-medium text-gray-500">Low Stock Items</h2>
-              <p className="text-2xl font-semibold text-gray-900">{stats.lowStockItems}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-green-100">
-              <svg
-                className="h-6 w-6 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
-                />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <h2 className="text-sm font-medium text-gray-500">Pending Requests</h2>
-              <p className="text-2xl font-semibold text-gray-900">{stats.pendingRequests}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-purple-100">
-              <svg
-                className="h-6 w-6 text-purple-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <h2 className="text-sm font-medium text-gray-500">Recent Activity</h2>
-              <p className="text-2xl font-semibold text-gray-900">{stats.recentActivity}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Requests */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Requests</h2>
-        </div>
-        <div className="divide-y divide-gray-200">
-          {!Array.isArray(recentRequests) || recentRequests.length === 0 ? (
-            <div className="px-6 py-4">
-              <p className="text-sm text-gray-500">No recent requests found</p>
-            </div>
-          ) : (
-            recentRequests.map((request) => (
-              <div key={request._id} className="px-6 py-4 hover:bg-gray-50 transition-colors duration-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <svg
-                        className="h-6 w-6 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
-                        />
-                      </svg>
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-sm font-medium text-gray-900">
-                        {request.component?.name || 'Unknown Component'}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        Requested by {request.requester?.name || 'Unknown User'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        request.status === 'pending'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : request.status === 'approved'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {request.status?.charAt(0).toUpperCase() + (request.status?.slice(1) || '')}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {request.createdAt ? new Date(request.createdAt).toLocaleDateString() : 'N/A'}
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <p className="text-sm text-gray-500">
-                    Quantity: {request.quantity}
-                  </p>
-                </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-blue-100">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
               </div>
-            ))
-          )}
+              <div className="ml-4">
+                <div className="text-sm font-medium text-gray-500">Total Components</div>
+                <div className="text-2xl font-semibold text-gray-900">{stats.totalComponents}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-yellow-100">
+                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <div className="text-sm font-medium text-gray-500">Low Stock Items</div>
+                <div className="text-2xl font-semibold text-gray-900">{stats.lowStockComponents}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-green-100">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <div className="text-sm font-medium text-gray-500">Total Issues</div>
+                <div className="text-2xl font-semibold text-gray-900">{stats.totalIssues}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-red-100">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <div className="text-sm font-medium text-gray-500">Pending Returns</div>
+                <div className="text-2xl font-semibold text-gray-900">{stats.pendingIssues}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="h-96">
+              <Pie data={categoryChartData} options={chartOptions} />
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="h-96">
+              <Bar data={quantityChartData} options={barChartOptions} />
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-800">Recent Activity</h2>
+            <button 
+              onClick={fetchDashboardStats}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              Refresh
+            </button>
+          </div>
+          <div className="space-y-4">
+            {loading ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : stats.recentActivity && stats.recentActivity.length > 0 ? (
+              stats.recentActivity.map((activity, index) => (
+                <div key={index} className="border-b border-gray-100 last:border-b-0 pb-4 last:pb-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-medium text-gray-900">
+                        {activity.studentName} {activity.status === 'pending' ? 'borrowed' : 'returned'} {activity.quantity} {activity.componentId?.componentName || 'Component'}
+                      </div>
+                      <div className="text-sm text-gray-500 mt-1">{activity.timestamp}</div>
+                    </div>
+                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                      activity.status === 'pending' 
+                        ? 'bg-yellow-100 text-yellow-800' 
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      {activity.status}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p className="mt-2 text-sm">No recent activity</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

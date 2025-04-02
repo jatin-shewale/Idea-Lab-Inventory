@@ -18,6 +18,18 @@ const Issue = () => {
     expectedReturnDate: '',
     purpose: ''
   });
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter issue history based on search query
+  const filteredIssueHistory = issueHistory.filter(issue => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      issue.studentName.toLowerCase().includes(searchLower) ||
+      issue.studentId.toLowerCase().includes(searchLower) ||
+      issue.department.toLowerCase().includes(searchLower) ||
+      issue.componentId.toLowerCase().includes(searchLower)
+    );
+  });
 
   useEffect(() => {
     setLoading(true);
@@ -57,16 +69,36 @@ const Issue = () => {
       toast.error('Failed to load issue history');
       setIssueHistory([]);
     } finally {
-      setLoading(false); // Ensure loading is set to false
+      setLoading(false);
     }
   };
   
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
   
     try {
-      await axiosInstance.post('/api/issues', formData);
+      // Find the selected component to get its _id
+      const selectedComponent = components.find(comp => comp.componentId === formData.componentId);
+      if (!selectedComponent) {
+        toast.error('Selected component not found');
+        return;
+      }
+
+      const issueData = {
+        ...formData,
+        componentId: selectedComponent._id // Use the component's _id instead of componentId
+      };
+
+      await axiosInstance.post('/api/issues', issueData);
       toast.success('Component issued successfully');
       setFormData({
         studentName: '',
@@ -86,13 +118,6 @@ const Issue = () => {
       setLoading(false);
     }
   };
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -111,7 +136,7 @@ const Issue = () => {
                 type="text"
                 name="studentName"
                 value={formData.studentName}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 required
                 className="w-full px-4 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 placeholder="Enter student name"
@@ -123,7 +148,7 @@ const Issue = () => {
                 type="text"
                 name="studentId"
                 value={formData.studentId}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 required
                 className="w-full px-4 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 placeholder="Enter student ID"
@@ -134,7 +159,7 @@ const Issue = () => {
               <select
                 name="department"
                 value={formData.department}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 required
                 className="w-full px-4 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
@@ -153,7 +178,7 @@ const Issue = () => {
                 type="text"
                 name="componentId"
                 value={formData.componentId}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 required
                 className="w-full px-4 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 placeholder="Enter component ID"
@@ -165,7 +190,7 @@ const Issue = () => {
                 type="number"
                 name="quantity"
                 value={formData.quantity}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 min="1"
                 required
                 className="w-full px-4 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -178,7 +203,7 @@ const Issue = () => {
                 type="date"
                 name="issueDate"
                 value={formData.issueDate}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 required
                 className="w-full px-4 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
@@ -189,7 +214,7 @@ const Issue = () => {
                 type="date"
                 name="expectedReturnDate"
                 value={formData.expectedReturnDate}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 required
                 className="w-full px-4 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
@@ -200,7 +225,7 @@ const Issue = () => {
             <textarea
               name="purpose"
               value={formData.purpose}
-              onChange={handleChange}
+              onChange={handleInputChange}
               required
               rows="2"
               className="w-full px-4 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -221,7 +246,18 @@ const Issue = () => {
 
       {/* Issue History */}
       <div className="bg-white rounded-lg shadow-sm p-5">
-        <h2 className="text-lg font-medium mb-4">Issue History</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-medium">Issue History</h2>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Search by student name or ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+        </div>
         <div className="overflow-x-auto">
           {loading ? (
             <div className="flex justify-center items-center py-4">
@@ -233,7 +269,7 @@ const Issue = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              {issueHistory.map((issue) => (
+              {filteredIssueHistory.map((issue) => (
                 <div key={issue._id} className="border rounded-md p-3 hover:bg-gray-50">
                   <div className="flex justify-between items-start">
                     <div>
