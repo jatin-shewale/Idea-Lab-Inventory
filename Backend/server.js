@@ -16,7 +16,13 @@ dotenv.config();
 connectDB();
 
 const app = express();
-app.use(cors());
+
+// CORS configuration
+app.use(cors({
+  origin: ['http://localhost:3000', 'https://idea-lab-inventory.vercel.app'],
+  credentials: true
+}));
+
 app.use(express.json())
 
 // Routes
