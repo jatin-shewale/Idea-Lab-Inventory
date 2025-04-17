@@ -165,6 +165,7 @@ const Issue = () => {
               >
                 <option value="">Select Department</option>
                 <option value="CSE">Computer Science</option>
+                <option value="AI&DS">Artificial Intelligence</option>
                 <option value="ECE">Electronics</option>
                 <option value="ME">Mechanical</option>
                 <option value="CE">Civil</option>
