@@ -22,7 +22,9 @@ export const createIssue = async (req, res) => {
     }
 
     if (inventoryItem.quantity < quantity) {
-      return res.status(400).json({ message: "Insufficient quantity available" });
+      return res
+        .status(400)
+        .json({ message: "Insufficient quantity available" });
     }
 
     // Create the issue
@@ -30,24 +32,23 @@ export const createIssue = async (req, res) => {
       studentName,
       studentId,
       department,
-      componentId: inventoryItem._id, // Use the component's _id
+      componentId: inventoryItem._id, 
       quantity,
       issueDate,
       expectedReturnDate,
       purpose,
-      status: "pending", // Set status to pending
-      user: req.user._id, // Use the authenticated user's ID
+      status: "pending",
+      user: req.user._id, 
     });
 
     // Update inventory quantity
-    await Inventory.findByIdAndUpdate(
-      inventoryItem._id,
-      { $inc: { quantity: -quantity } }
-    );
+    await Inventory.findByIdAndUpdate(inventoryItem._id, {
+      $inc: { quantity: -quantity },
+    });
 
     res.status(201).json(issue);
   } catch (error) {
-    console.error('Error creating issue:', error);
+    console.error("Error creating issue:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -55,20 +56,21 @@ export const createIssue = async (req, res) => {
 // Get all issues
 export const getIssues = async (req, res) => {
   try {
-    const { status, studentId, page = 1, limit = 10 } = req.query;
+    const { status, studentId, page = 1 } = req.query;
 
-    // Build a query object based on the provided filters
     const query = {};
     if (status) query.status = status;
     if (studentId) query.studentId = studentId;
 
-    // Pagination logic
+    const limit = await Issue.countDocuments(query);
     const skip = (page - 1) * limit;
     const total = await Issue.countDocuments(query);
+
     const issues = await Issue.find(query)
+      .sort({ createdAt: -1 })
       .populate("user", "name email")
       .skip(skip)
-      .limit(Number(limit));
+      .limit(limit);
 
     res.status(200).json({
       issues,

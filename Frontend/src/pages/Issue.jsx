@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import axiosInstance from '../utils/axiosInstance';
 import toast from 'react-hot-toast';
 
@@ -19,6 +18,10 @@ const Issue = () => {
     purpose: ''
   });
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5); // You can adjust this number based on how many items you want to show per page
 
   // Filter issue history based on search query
   const filteredIssueHistory = issueHistory.filter(issue => {
@@ -30,6 +33,13 @@ const Issue = () => {
       issue.componentId.toLowerCase().includes(searchLower)
     );
   });
+
+  // Logic to get the current page's issues
+  const indexOfLastIssue = currentPage * itemsPerPage;
+  const indexOfFirstIssue = indexOfLastIssue - itemsPerPage;
+  const currentIssues = filteredIssueHistory.slice(indexOfFirstIssue, indexOfLastIssue);
+
+  const totalPages = Math.ceil(filteredIssueHistory.length / itemsPerPage);
 
   useEffect(() => {
     setLoading(true);
@@ -86,7 +96,6 @@ const Issue = () => {
     setLoading(true);
   
     try {
-      // Find the selected component to get its _id
       const selectedComponent = components.find(comp => comp.componentId === formData.componentId);
       if (!selectedComponent) {
         toast.error('Selected component not found');
@@ -270,7 +279,7 @@ const Issue = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredIssueHistory.map((issue) => (
+              {currentIssues.map((issue) => (
                 <div key={issue._id} className="border rounded-md p-3 hover:bg-gray-50">
                   <div className="flex justify-between items-start">
                     <div>
@@ -296,9 +305,27 @@ const Issue = () => {
             </div>
           )}
         </div>
+        {/* Pagination */}
+        <div className="flex justify-between items-center mt-4">
+          <button
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span className="text-sm text-gray-600">Page {currentPage} of {totalPages}</span>
+          <button
+            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
-export default Issue; 
+export default Issue;
