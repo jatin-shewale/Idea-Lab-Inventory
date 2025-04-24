@@ -18,12 +18,10 @@ const Issue = () => {
     purpose: ''
   });
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5); // You can adjust this number based on how many items you want to show per page
 
-  // Filter issue history based on search query
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
+
   const filteredIssueHistory = issueHistory.filter(issue => {
     const searchLower = searchQuery.toLowerCase();
     return (
@@ -34,11 +32,9 @@ const Issue = () => {
     );
   });
 
-  // Logic to get the current page's issues
   const indexOfLastIssue = currentPage * itemsPerPage;
   const indexOfFirstIssue = indexOfLastIssue - itemsPerPage;
   const currentIssues = filteredIssueHistory.slice(indexOfFirstIssue, indexOfLastIssue);
-
   const totalPages = Math.ceil(filteredIssueHistory.length / itemsPerPage);
 
   useEffect(() => {
@@ -58,7 +54,7 @@ const Issue = () => {
       setComponents([]);
     }
   };
-  
+
   const fetchStudents = async () => {
     try {
       const response = await axiosInstance.get('/api/students');
@@ -69,7 +65,7 @@ const Issue = () => {
       setStudents([]);
     }
   };
-  
+
   const fetchIssueHistory = async () => {
     try {
       const response = await axiosInstance.get('/api/issues');
@@ -82,7 +78,7 @@ const Issue = () => {
       setLoading(false);
     }
   };
-  
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -94,7 +90,7 @@ const Issue = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-  
+
     try {
       const selectedComponent = components.find(comp => comp.componentId === formData.componentId);
       if (!selectedComponent) {
@@ -104,7 +100,7 @@ const Issue = () => {
 
       const issueData = {
         ...formData,
-        componentId: selectedComponent._id // Use the component's _id instead of componentId
+        componentId: selectedComponent._id
       };
 
       await axiosInstance.post('/api/issues', issueData);
@@ -128,12 +124,14 @@ const Issue = () => {
     }
   };
 
+  const today = new Date().toISOString().split('T')[0];
+
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold text-gray-800">Issue Components</h1>
       </div>
-      
+
       {/* Issue Form */}
       <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
         <h2 className="text-lg font-medium mb-4">New Issue</h2>
@@ -215,6 +213,8 @@ const Issue = () => {
                 value={formData.issueDate}
                 onChange={handleInputChange}
                 required
+                min={today}
+                max={today}
                 className="w-full px-4 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
@@ -226,6 +226,7 @@ const Issue = () => {
                 value={formData.expectedReturnDate}
                 onChange={handleInputChange}
                 required
+                min={today}
                 className="w-full px-4 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
@@ -305,7 +306,6 @@ const Issue = () => {
             </div>
           )}
         </div>
-        {/* Pagination */}
         <div className="flex justify-between items-center mt-4">
           <button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
